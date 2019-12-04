@@ -6,6 +6,10 @@ const config = require('./config');
 const mkQuery = require('./dbutil');
 const jwt = require('jsonwebtoken');
 const currTime = (new Date()).getTime();
+const MongoClient= require('mongodb').MongoClient;
+const client= new MongoClient(config.mongodb.url);
+const otplib = require('otplib');
+const gSecret = config.otpSecret;
 
 const PORT = 3000;
 
@@ -103,28 +107,44 @@ app.get([ '/', '/login' ], (req, resp) => {
 
 app.get('/status/:code', (req, resp) =>{
     //need to do more checking
-    resp.status(parseInt(req.params.code,10).json({message: 'incorrect login'}));
+    resp.status(parseInt(req.params.code,10)).json({message: 'incorrect login'});
 })
 
+// this is the endpoint which requires authentication. so do the token verification here
 app.get('/customers', 
     (req,resp,next)=>{
+        console.log("in customers");
         const authorization = req.get('Authorization'); // get the header
-        //if cannot get the header, return 403
-        if (!authorization){
-            resp.status(403).json({message: 'not authorized'});
+        //if cannot get the header and if Authroization is NOT in this format: Authorization: BearereyJhbGciOiJ...SsxY, return 403
+        if (!(authorization && authorization.startsWith('Bearer '))){
+            return resp.status(403).json({message: 'not authorized'});
         }
-        // if Authroization is NOT in this format: Authorization: BearereyJhbGciOiJ...SsxY, return 403
-        if (!authorization.startsWith('Bearer ')){
-            resp.status(403).json({message: 'not authorized'});
-        }
-        const tokenStr = authorization.substring('Bearer '.length);
-        try{
-            req.jwt = jwt.verify(tokenStr, config.tokenSecret);
-            next();
-        }
-        catch (e){
-            return resp.status(401).json({message: 'invalid token'});
-        }
+        const tokenStr = authorization.substring('Bearer '.length); //get everything after "Bearer "
+        client.db('tokens').collection('jwt_tokens')
+        .find({jwt: tokenStr})
+        .toArray()
+        .then(result=>{
+            if (result.length>0){
+                console.log("found token from mongodb");
+                req.jwt = result[0].jwt;
+                return next();
+            }
+            console.log("token not found in mongodb");
+            try{
+                req.jwt = jwt.verify(tokenStr, config.tokenSecret);
+                client.db('tokens').collection('jwt_tokens')
+                .insertOne({name: req.jwt.sub, jwt: tokenStr, token: req.jwt})
+                .then(result=> {
+                    console.log("inserted token into mongodb");
+                    next();
+                })
+            }
+            catch (e){
+                return resp.status(401).json({message: 'invalid token'});
+            }
+        });
+
+        
     },
     (req, resp)=>{
         console.log('token:', req.jwt);
@@ -145,9 +165,24 @@ app.post(
         console.log("user=", req.user);
         getUserDetails([req.user])
         .then (result=>{
+            resp.status(200).json({authenticatedLogin: result});
+        })
+    }
+)
+
+app.post(
+    '/authOtp', express.urlencoded({extended:true}),
+    (req, resp) =>{
+
+        //check that the user entered otp = the actual timebased otp
+        console.log("req.body=", req.body);
+        let userOtp = req.body.otp;
+        const code = otplib.authenticator.generate(gSecret);
+        console.log("code=", code, ", userOtp=", userOtp);
+        if (userOtp == code){
             //issue the JWT token
             const token=  jwt.sign({
-                sub: req.user,
+                sub: req.body.username,
                 iss: 'snmf-day32-token',
                 iat: currTime / 1000,
                 exp: currTime/1000 + (30),
@@ -158,13 +193,19 @@ app.post(
                     }
             },config.tokenSecret);
             return resp.status(200).json({token_type: 'Bearer', access_token: token});
-        })
-        
+        }
+        console.log("invalid otp");
+        return resp.redirect('/status/401', 200);
     }
 )
 
 app.use(express.static(__dirname + '/public'))
-
-app.listen(PORT,
-    () => { console.info(`Application started on port ${PORT} at ${new Date()}`) }
-);
+client.connect((err=>{
+    if(err){
+        console.error('error:',err);
+        process.exit(-1);
+    }
+    app.listen(PORT,
+        () => { console.info(`Application started on port ${PORT} at ${new Date()}`) }
+    );
+}))

@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { TokenService } from '../services/token.service';
+import { OtpService } from '../services/otp.service';
 
 @Component({
   selector: 'app-list',
@@ -9,19 +10,19 @@ import { TokenService } from '../services/token.service';
 })
 export class ListComponent implements OnInit {
 
-  constructor(private router: Router, private activatedRoute: ActivatedRoute, private tokenSvc: TokenService) { }
+  constructor(private router: Router, private activatedRoute: ActivatedRoute, private tokenSvc: TokenService, private otpSvc: OtpService) { }
 
 
   ngOnInit() {
-    console.log("is authenticated=", this.tokenSvc.isAuthenticated());
-    this.tokenSvc.getCustomers()
+    console.log("is authenticated=", this.tokenSvc.isAuthenticatedLogin());
+    this.otpSvc.getCustomers()
     .then(result=>{
       console.log("getCustomers result", result);
     })
   }
 
   reload(){
-    this.tokenSvc.getCustomers()
+    this.otpSvc.getCustomers()
     .then(result=>{
       console.log("getCustomers result", result);
     })

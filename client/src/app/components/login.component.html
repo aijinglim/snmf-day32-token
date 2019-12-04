@@ -18,5 +18,10 @@
                 <button type="submit" [disabled]=form.invalid>Login</button>
             </td>
         </tr>
+        <tr>
+            <td colspan="2">
+                <button type="button" [disabled]=form.invalid (click)=registerFor2FA()>Register for 2FA</button>
+            </td>
+        </tr>
     </table>
 </form>

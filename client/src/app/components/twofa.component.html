@@ -1,0 +1,16 @@
+<h2>Please enter the 6 digit otp in your phone: </h2>
+<form #form="ngForm" (ngSubmit)="twofa(form)">
+    <table>
+        <tr>
+            <td>OTP:</td>
+            <td>
+                <input type="text" name="otp" size="30" maxlength="6" required ngModel>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <button type="submit" [disabled]=form.invalid>Login</button>
+            </td>
+        </tr>
+    </table>
+</form>

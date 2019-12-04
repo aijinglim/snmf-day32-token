@@ -17,11 +17,16 @@ export class LoginComponent implements OnInit {
 
   login(form: NgForm){
     console.log("form.value=", form.value);
-    this.tokenSvc.authenticate(form.value['username'], form.value['password'])
+    const username = form.value['username']
+    this.tokenSvc.authenticate(username, form.value['password'])
     .then (result=>{
-      console.log("my token=", result);
-    })
-    this.router.navigate(['/list']);
+      console.log("authenticated login=", result);  
+      this.router.navigate(['/twofa', username]); //if you want this to happen AFTER you get the result, make sure to put it in the then
+    });
+  }
+
+  registerFor2FA(){
+    
   }
 
 }
